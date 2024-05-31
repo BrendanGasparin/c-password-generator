@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -16,14 +17,32 @@ void print_banner();
 void print_password(char password[], int length);
 
 int main(void) {
-    print_banner();
-
-    int num_chars = get_int("Enter integer for password length. (Minimum 8): ");
-    char password[num_chars];
-    bool valid = false;
-
     // Seed the random number generator with the current time
     srand(time(NULL));
+    
+    // Print the program banner
+    print_banner();
+
+    // All special characters allowed in the password
+    const char SPECIAL_CHARACTERS[]="!\"#%%'()*+,-./:;<=>?@[\\]^_`{|}~";
+    // The number of allowed special characters in the password
+    const int SPECIAL_CHAR_NUM = 30;
+    // The length of the alphabet
+    const int ALPHABET_LENGTH = 26;
+    // The number of digits
+    const int DIGIT_NUM = 10;
+    // The starting position of ASCII uppercase letters
+    const int ASCII_UC = 65;
+    // The starting position of ASCII lowercase letters
+    const int ASCII_LC = 97;
+    // The starting position of ASCII digits
+    const int ASCII_DIGITS = 48;
+    // The number of characters the user desires for their password
+    int num_chars = get_int("Enter integer for password length (8-65535): ");
+    // Array to hold the password characters
+    char password[num_chars];
+    // True if the password is strong, else false
+    bool valid = false;
 
     // Generate passwords until a valid strong one is generated
     while (!valid) {
@@ -34,27 +53,16 @@ int main(void) {
 
             // Uppercase characters
             if (char_type == 0)
-                password[i] = (char)((rand() % 26) + 65);
+                password[i] = (char)((rand() % ALPHABET_LENGTH) + ASCII_UC);
             // Lowercase characters
             else if (char_type == 1)
-                password[i] = (char)((rand() % 26) + 97);
+                password[i] = (char)((rand() % ALPHABET_LENGTH) + ASCII_LC);
             // Numbers
             else if (char_type == 2)
-                password[i] = (char)((rand() % 10) + 48);
+                password[i] = (char)((rand() % DIGIT_NUM) + ASCII_DIGITS);
             // Special characters
-            else if (char_type == 3) {
-                // Special ASCII characters are scattered around the ASCII chart
-                // Each should have equal chance of being used
-                int random = rand() % 32;
-                if (random <= 14)
-                    password[i] = (char)(random + 33);
-                else if (random <= 21)
-                    password[i] = (char)(random + 58);
-                else if (random <= 27)
-                    password[i] = (char)(random + 91);
-                else
-                    password[i] = (char)(random + 123);
-            }
+            else
+                password[i] = SPECIAL_CHARACTERS[rand() % SPECIAL_CHAR_NUM];
         }
 
         // Verify the password uses uppercase, lowercase, numeric, and special characters
@@ -90,11 +98,12 @@ struct input* get_input(char *prompt) {
 
 int get_int(char *prompt) {
     bool valid;
-    int final_int;
+    unsigned int final_int;
     do {
         struct input *chars = get_input("Enter integer for password length. (Minimum 8): ");
         struct input *temp = chars;
         int char_count = 0;
+        double n = 0;
         final_int = 0;
         valid = true;
 
@@ -126,21 +135,31 @@ int get_int(char *prompt) {
                 free(temp);
             }
 
-            // Check all characters are ints
-            for (int i = 0; i < char_count; i++) {
-                if (input[i] < 0 || input[i] > 9) {
-                    valid = false;
-                }
-            }
-
-            // convert the array of single-digit ints into one multi-digit int
-            for (int i = 0; i < char_count; i++) {
-                final_int += input[char_count - i - 1] * (int)pow(10.0, (double)i);
-            }
-
-            // Input must be >= 8
-            if (final_int < 8)
+            // If character count is higher than five then integer overflow and input is invalid
+            if (char_count > 5)
                 valid = false;
+            else {
+                // Check all characters are digits
+                for (int i = 0; i < char_count; i++) {
+                    if (input[i] < 0 || input[i] > 9) {
+                        valid = false;
+                    }
+                }
+
+                // convert the array of single-digit ints into one multi-digit int
+                for (int i = 0; i < char_count; i++) {
+                    // Convert to a double first so we can check for integer overflow
+                    n += input[char_count - i - 1] * pow(10.0, (double)i);
+                    if (n > 65535)
+                        valid = false;
+                    else
+                        final_int = (int)n;
+                }
+
+                // Input must be >= 8
+                if (final_int < 8)
+                    valid = false;
+            }
         }
 
     } while (valid == false);
@@ -154,11 +173,11 @@ bool is_password_secure(char pass[], int length) {
     int numeric_count = 0;
     int special_count = 0;
     for (int i = 0; i < length; i++) {
-        if (pass[i] >= 65 && pass[i] <= 90)
+        if (isupper(pass[i]))
             uppercase_count++;
-        if (pass[i] >= 97 & pass[i] <= 122)
+        if (islower(pass[i]))
             lowercase_count++;
-        if (pass[i] >= 48 && pass[i] <= 57)
+        if (isdigit(pass[i]))
             numeric_count++;
         else
             special_count++;
